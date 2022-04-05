@@ -1,0 +1,35 @@
+<launch>
+
+  <arg name="server" default="10.1.1.198"/>
+  <arg name="rigid" default="Quadrotor01"/>
+ 
+ 
+  <node pkg="gcserver" type="visualization_node" name="visualization_node">
+  </node>
+<!--  
+  <node pkg="gcserver" type="offboard_node" name="offboard_node">
+  </node>
+-->
+  <node pkg="vrpn_client_ros" type="vrpn_client_node" name="vrpn_client_node" output="screen">
+    <rosparam subst_value="true">
+      server: $(arg server)
+      port: 3883
+
+      update_frequency: 100.0
+      frame_id: world
+
+      # Use the VRPN server's time, or the client's ROS time.
+      use_server_time: false
+      broadcast_tf: true
+
+      # Must either specify refresh frequency > 0.0, or a list of trackers to create
+      refresh_tracker_frequency: 1.0
+      #trackers:
+      #- FirstTracker
+      #- SecondTracker
+    </rosparam>
+  </node>
+
+  <remap to="/vrpn_client_node/$(arg rigid)/pose" from="/mavros/vision_pose/pose"/>
+
+</launch>
