@@ -38,8 +38,18 @@ int main(int argc, char **argv)
 	pnh.param<double>("z_epsilon", z_epsilon, 0.05);
 	ROS_INFO("z_threshold %f, z_epsilon %f", z_threshold, z_epsilon);
 	
-	APFHelper apfhelper;
-	ArtificialPotentialField apf(&apfhelper);
+	double coef_attr, coef_repl, dist_threshold;
+	int max_iter;
+	double march, tolerance;
+	pnh.param<double>("coef_attraction", coef_attr, 1.0);
+	pnh.param<double>("coef_replusion", coef_repl, 10.0);
+	pnh.param<double>("distance_threshold", dist_threshold, 3);
+	pnh.param<int>("max_iteration", max_iter, 5000);
+	pnh.param<double>("march", march, 0.25);
+	pnh.param<double>("tolerance", tolerance, 0.1);
+
+	APFHelper apfhelper(coef_attr, coef_repl, dist_threshold);
+	ArtificialPotentialField apf(&apfhelper, max_iter, march, tolerance);
 	
 	
 	ros::Subscriber local_pos_sub = nh.subscribe<geometry_msgs::PoseStamped>
