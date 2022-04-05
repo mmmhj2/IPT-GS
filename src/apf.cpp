@@ -46,6 +46,8 @@ vector2d
 ArtificialPotentialField::GetStep(const vector2d & start, const vector2d & finish, const std::vector <vector2d> & obstacles)
 const noexcept
 {
+	if((start - finish).norm() < tolerance)
+		return finish;
 	vector2d force = helper->GetAttraction(start, finish) + helper->GetReplusion(start, obstacles);
 	vector2d delta = force  * (1/force.norm()) * march;
 	return (start + delta);
