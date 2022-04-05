@@ -6,7 +6,9 @@
 		<param name="end_y" type="double" value="3.02"/>
 		<rosparam param="obstacles">[]</rosparam>
 	</node>
+<!--
 	<node pkg="gcserver" type="offboard_node" name="offboard_node" output="screen">
 	</node>
+-->
 </launch>
 

@@ -19,6 +19,12 @@ void bat_cb(const sensor_msgs::BatteryState::ConstPtr & msg)
 	bat = *msg;
 }
 
+geometry_msgs::PoseStamped target_pos;
+void target_cb(const geometry_msgs::PoseStamped::ConstPtr & msg)
+{
+	target_pos = *msg;
+}
+
 double GetYaw(const geometry_msgs::Quaternion & quat)
 {
 	double siny_cosp = 2 * (quat.w * quat.z + quat.x * quat.y);
@@ -37,13 +43,16 @@ int main(int argc, char * argv[])
 	ros::init(argc, argv, "visualization_node");
 	ros::NodeHandle nh;
 
-	std::string mavros_pose_node_name = "/mavros/local_position/pose";
-	std::string mavros_battery_node_name = "/mavros/battery";
+	std::string mavros_pose_node_name = "mavros/local_position/pose";
+	std::string mavros_battery_node_name = "mavros/battery";
+	std::string ppnode_name = "pp_node/target_pose";
 
 	ros::Subscriber loc_sub = nh.subscribe<geometry_msgs::PoseStamped>
 		(mavros_pose_node_name, 10, loc_pos_cb);
 	ros::Subscriber bat_sub = nh.subscribe<sensor_msgs::BatteryState>
 		(mavros_battery_node_name, 10, bat_cb);
+	ros::Subscriber target_sub = nh.subscribe<geometry_msgs::PoseStamped>
+		(ppnode_name, 10, target_cb);
 //	ros::Subscriber state_sub = nh.subscribe<mavros_msgs::State>
 //		("mavros/state", 10, state_cb);
 
@@ -73,21 +82,22 @@ int main(int argc, char * argv[])
 	ROS_INFO("Successfully initialized visualization system");
 	//bool SDLQuit = false;
 	
-	SDL_Surface * s_label = nullptr;
-	SDL_Texture * t_label = nullptr;
+	SDL_Surface *s_label{nullptr}, *s_cursor{nullptr};
+	SDL_Texture *t_label{nullptr}, *t_cursor{nullptr};
 	std::string label_path = ros::package::getPath("gcserver");
 	if(*label_path.rbegin() != '/')
 		label_path += "/";
-	label_path += "drone_label.bmp";
 
-	s_label = SDL_LoadBMP(label_path.c_str());
-	if(s_label == nullptr)
+	s_label = SDL_LoadBMP((label_path + "drone_label.bmp").c_str());
+	s_cursor = SDL_LoadBMP((label_path + "cursor.bmp").c_str());
+	if(s_label == nullptr || s_cursor == nullptr)
 	{
 		ROS_FATAL("Cannot load bitmap %s, %s", label_path.c_str(), SDL_GetError());
 		return -1;
 	}
 	t_label = SDL_CreateTextureFromSurface(renderer, s_label);
-	if(t_label == nullptr)
+	t_cursor = SDL_CreateTextureFromSurface(renderer, s_cursor);
+	if(t_label == nullptr || t_cursor == nullptr)
 	{
 		ROS_FATAL("Cannot create label texture, %s", SDL_GetError());
 		return -1;
@@ -137,13 +147,23 @@ int main(int argc, char * argv[])
 			SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);
 			SDL_RenderFillRect(renderer, &battery);
 		}
+
+		// Draw the target
+		center = GetPixelLoc(target_pos.pose.position.x, target_pos.pose.position.y);
+		drone.x = center.first - 64;
+		drone.y = center.second - 64;
+		drone.h = drone.w = 128;
+		SDL_RenderCopyEx(renderer, t_cursor, nullptr, &drone, 0, 0, flip);
+
 		SDL_RenderPresent(renderer);
 		ros::spinOnce();
 		rate.sleep();
 	}
 	
 	SDL_DestroyTexture(t_label);
+	SDL_DestroyTexture(t_cursor);
 	SDL_FreeSurface(s_label);
+	SDL_FreeSurface(s_cursor);
 
 	SDL_DestroyWindow(window);
 	SDL_DestroyRenderer(renderer);
