@@ -29,7 +29,7 @@
 *
 */
 
-#include "vrpn_client_ros/vrpn_client_ros.h"
+#include "vrpn_client_ros.h"
 
 #include <string>
 

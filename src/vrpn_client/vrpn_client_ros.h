@@ -32,7 +32,7 @@
 #ifndef VRPN_CLIENT_ROS_VRPN_CLIENT_ROS_H
 #define VRPN_CLIENT_ROS_VRPN_CLIENT_ROS_H
 
-#include "vrpn_client_ros/vrpn_client_ros.h"
+#include "vrpn_client_ros.h"
 
 #include "ros/ros.h"
 #include "geometry_msgs/PoseStamped.h"

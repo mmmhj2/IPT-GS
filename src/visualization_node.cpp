@@ -57,7 +57,8 @@ int main(int argc, char * argv[])
 //		("mavros/state", 10, state_cb);
 
 	ros::Rate rate(20.0);
-
+	
+	ROS_INFO("Initializing SDL...");
 	SDL_Window * window;
 	SDL_Renderer * renderer;
 	if(SDL_Init(SDL_INIT_VIDEO) != 0)

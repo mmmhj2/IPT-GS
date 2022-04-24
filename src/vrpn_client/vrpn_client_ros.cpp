@@ -29,7 +29,7 @@
 *
 */
 
-#include "vrpn_client_ros/vrpn_client_ros.h"
+#include "vrpn_client_ros.h"
 
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2/LinearMath/Matrix3x3.h"
