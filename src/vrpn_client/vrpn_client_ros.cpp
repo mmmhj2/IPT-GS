@@ -46,7 +46,7 @@ namespace
 
 namespace vrpn_client_ros
 {
-
+	constexpr double discard_position_threshold = 999999.0;
   /**
    * check Ros Names as defined here: http://wiki.ros.org/Names
    */
@@ -114,6 +114,7 @@ namespace vrpn_client_ros
     nh.param<bool>("use_server_time", use_server_time_, false);
     nh.param<bool>("broadcast_tf", broadcast_tf_, false);
     nh.param<bool>("process_sensor_id", process_sensor_id_, false);
+	//nh.param<double>("discard_position_threshold", discard_position_threshold, 999999.0);
 
     pose_msg_.header.frame_id = twist_msg_.header.frame_id = accel_msg_.header.frame_id = transform_stamped_.header.frame_id = frame_id;
 
@@ -163,6 +164,22 @@ namespace vrpn_client_ros
     {
       *pose_pub = nh.advertise<geometry_msgs::PoseStamped>("pose", 1);
     }
+	
+	// Discarding abnormal position data
+	bool discard = false;
+	for(int i = 0; i < 3; i++)
+		if(tracker_pose.pos[i] < -discard_position_threshold ||
+			tracker_pose.pos[i] > discard_position_threshold)
+		{
+			discard = true;
+			break;
+		}
+	if(discard)
+	{
+		ROS_WARN_THROTTLE(1, "Discarding position data (%f,%f,%f)", 
+			tracker_pose.pos[0], tracker_pose.pos[1], tracker_pose.pos[2]);
+		return;
+	}
 
     if (pose_pub->getNumSubscribers() > 0)
     {
