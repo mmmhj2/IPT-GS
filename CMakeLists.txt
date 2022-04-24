@@ -10,9 +10,12 @@ project(gcserver)
 find_package(catkin REQUIRED COMPONENTS
 	roscpp
 	roslib
+	geometry_msgs
+	tf2_ros
 )
 
 find_package(SDL2 REQUIRED)
+find_package(VRPN REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -142,6 +145,25 @@ target_link_libraries(offboard_node ${catkin_LIBRARIES})
 
 add_executable(pp_node src/pp_node.cpp src/apf.cpp)
 target_link_libraries(pp_node ${catkin_LIBRARIES})
+
+# Nodes of VRPN Client
+add_library(vrpn_client_ros src/vrpn_client/vrpn_client_ros.cpp)
+target_link_libraries(vrpn_client_ros ${catkin_LIBRARIES} ${VRPN_LIBRARIES})
+
+add_executable(vrpn_tracker_node src/vrpn_client/vrpn_tracker_node.cpp)
+add_dependencies(vrpn_tracker_node vrpn_client_ros)
+target_link_libraries(vrpn_tracker_node
+  vrpn_client_ros
+  ${catkin_LIBRARIES}
+)
+
+add_executable(vrpn_client_node src/vrpn_client/vrpn_client_node.cpp)
+add_dependencies(vrpn_client_node vrpn_client_ros)
+target_link_libraries(vrpn_client_node
+  vrpn_client_ros
+  ${catkin_LIBRARIES}
+)
+
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
