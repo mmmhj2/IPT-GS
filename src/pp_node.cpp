@@ -1,6 +1,7 @@
 #include <ros/ros.h>
 #include <ros/console.h>
 
+#include <geometry_msgs/Polygon.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <mavros_msgs/CommandBool.h>
 #include <mavros_msgs/SetMode.h>
@@ -30,6 +31,7 @@ int main(int argc, char **argv)
 	ros::NodeHandle nh, pnh("~");
 	
 	std::string target_pos_topic = "pp_node/target_pose";
+	std::string tarjectory_topic = "pp_node/tarjectory";
 	
 	// Parameters
 	double z_threshold;
@@ -47,6 +49,11 @@ int main(int argc, char **argv)
 	pnh.param<int>("max_iteration", max_iter, 5000);
 	pnh.param<double>("march", march, 0.25);
 	pnh.param<double>("tolerance", tolerance, 0.1);
+	
+	bool generate_traj;
+	int traj_iteration;
+	pnh.param<bool>("GenerateTrajectory", generate_traj, false);
+	pnh.param<int>("TrajectoryIteration", traj_iteration, 10);
 
 	APFHelper apfhelper(coef_attr, coef_repl, dist_threshold);
 	ArtificialPotentialField apf(&apfhelper, max_iter, march, tolerance);
@@ -56,6 +63,9 @@ int main(int argc, char **argv)
 		("mavros/local_position/pose", 10, local_pos_cb);
 	ros::Publisher target_pos_pub = nh.advertise<geometry_msgs::PoseStamped>
 		(target_pos_topic, 10);
+	ros::Publisher traj_pub;
+	if(generate_traj)
+		traj_pub = nh.advertise<geometry_msgs::Polygon>(tarjectory_topic, 10);
 		
 	ros::Rate rate{20.0};
 	
@@ -63,6 +73,7 @@ int main(int argc, char **argv)
 	targetPose.pose.position.x = 0;
 	targetPose.pose.position.y = 0;
 	targetPose.pose.position.z = z_threshold;
+	geometry_msgs::Polygon trajectory;
 	
 	// TODO : Use ROS service to set obstacles dynamically
 	bool aquiredTarget = false;
@@ -91,6 +102,8 @@ int main(int argc, char **argv)
 	while(ros::ok())
 	{
 		ROS_DEBUG("Planning route");
+		trajectory.points.clear();
+		
 		if(ready)
 		{
 			ROS_INFO_ONCE("Ready for planning");
@@ -112,6 +125,14 @@ int main(int argc, char **argv)
 				targetPose.pose.position.z = z_threshold;
 				
 				ROS_DEBUG("Retaining altitude : %f -> %f", position.z, z_threshold);
+				if(generate_traj)
+				{
+					geometry_msgs::Point32 p;
+					p.x = targetPose.pose.position.x;
+					p.y = targetPose.pose.position.y;
+					p.z = targetPose.pose.position.z;
+					trajectory.points.push_back(std::move(p));
+				}
 			}
 			else
 			{
@@ -123,9 +144,29 @@ int main(int argc, char **argv)
 				targetPose.pose.position.y = newtarget.y;
 				targetPose.pose.position.z = z_threshold;
 				ROS_INFO("Moving to : %f, %f", targetPose.pose.position.x, targetPose.pose.position.y);
+				
+				if(generate_traj)
+				{
+					geometry_msgs::Point32 p;
+					p.x = targetPose.pose.position.x;
+					p.y = targetPose.pose.position.y;
+					p.z = targetPose.pose.position.z;
+					trajectory.points.push_back(std::move(p));
+					for(int i = 0; i < traj_iteration; ++i)
+					{
+						vector2d newPosition = apf.GetStep(newtarget, end, obs);
+						p.x = newPosition.x, p.y = newPosition.y, p.z = z_threshold;
+						trajectory.points.push_back(p);
+						newtarget = newPosition;
+					}
+				}
+					
 			}
 		}
+		
 		target_pos_pub.publish(targetPose);
+		if(generate_traj)
+			traj_pub.publish(trajectory);
 		
 		ros::spinOnce();
 		rate.sleep();
