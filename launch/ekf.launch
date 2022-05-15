@@ -1,0 +1,6 @@
+<launch>
+	<node pkg="tf" type="static_transform_publisher" name="uwb_transformer" args="-1 -1 1.95 0 0 0 odom uwb 100"/>
+	<node pkg="robot_localization" type="ekf_localization_node" name="ekf_estimator">
+		<rosparam command="load" file="$(find gcserver)/launch/ekf_config.yaml"/>
+	</node>
+</launch>
