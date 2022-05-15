@@ -1,5 +1,10 @@
 <launch>
-	<node pkg="tf" type="static_transform_publisher" name="uwb_transformer" args="-1 -1 1.95 0 0 0 odom uwb 100"/>
+	
+	<arg name="uwb_x_offset" default="-1" />
+	<arg name="uwb_y_offset" default="-1" />
+	<arg name="uwb_z_offset" default="1.95" />
+
+	<node pkg="tf" type="static_transform_publisher" name="uwb_transformer" args="$(arg uwb_x_offset) $(arg uwb_y_offset) $(arg uwb_z_offset) 0 0 0 odom uwb 75"/>
 	<node pkg="robot_localization" type="ekf_localization_node" name="ekf_estimator">
 		<rosparam command="load" file="$(find gcserver)/launch/ekf_config.yaml"/>
 	</node>
