@@ -30,8 +30,10 @@ int main(int argc, char **argv)
 	ros::init(argc, argv, "path_planning_node");
 	ros::NodeHandle nh, pnh("~");
 	
-	std::string target_pos_topic = "pp_node/target_pose";
-	std::string tarjectory_topic = "pp_node/tarjectory";
+	std::string target_pos_topic /*= "pp_node/target_pose"*/;
+	std::string trajectory_topic /*= "pp_node/tarjectory"*/;
+	pnh.param<std::string>("TargetTopicName", target_pos_topic, "pp_node/target_pose");
+	pnh.param<std::string>("TrajectoryTopic", trajectory_topic, "pp_node/trajectory");
 	
 	// Parameters
 	double z_threshold;
@@ -65,7 +67,7 @@ int main(int argc, char **argv)
 		(target_pos_topic, 10);
 	ros::Publisher traj_pub;
 	if(generate_traj)
-		traj_pub = nh.advertise<geometry_msgs::Polygon>(tarjectory_topic, 10);
+		traj_pub = nh.advertise<geometry_msgs::Polygon>(trajectory_topic, 10);
 		
 	ros::Rate rate{20.0};
 	
@@ -151,7 +153,7 @@ int main(int argc, char **argv)
 					p.x = targetPose.pose.position.x;
 					p.y = targetPose.pose.position.y;
 					p.z = targetPose.pose.position.z;
-					trajectory.points.push_back(std::move(p));
+					trajectory.points.push_back(p);
 					for(int i = 0; i < traj_iteration; ++i)
 					{
 						vector2d newPosition = apf.GetStep(newtarget, end, obs);

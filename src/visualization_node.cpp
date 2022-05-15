@@ -1,5 +1,6 @@
 #include <ros/ros.h>
 #include <ros/package.h>
+#include <geometry_msgs/Polygon.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <sensor_msgs/BatteryState.h>
 #include <SDL2/SDL.h>
@@ -25,6 +26,12 @@ void target_cb(const geometry_msgs::PoseStamped::ConstPtr & msg)
 	target_pos = *msg;
 }
 
+std::vector<geometry_msgs::Point32> points;
+void traj_cb(const geometry_msgs::Polygon::ConstPtr & msg)
+{
+	points = msg->points;
+}
+
 double GetYaw(const geometry_msgs::Quaternion & quat)
 {
 	double siny_cosp = 2 * (quat.w * quat.z + quat.x * quat.y);
@@ -41,18 +48,29 @@ std::pair<int, int> GetPixelLoc(double x, double y)
 int main(int argc, char * argv[])
 {
 	ros::init(argc, argv, "visualization_node");
-	ros::NodeHandle nh;
+	ros::NodeHandle nh, pnh("~");
 
-	std::string mavros_pose_node_name = "mavros/local_position/pose";
-	std::string mavros_battery_node_name = "mavros/battery";
-	std::string ppnode_name = "pp_node/target_pose";
-
+	std::string mavros_pose_node_name /*= "mavros/local_position/pose"*/;
+	std::string mavros_battery_node_name /*= "mavros/battery"*/;
+	std::string ppnode_name /*= "pp_node/target_pose"*/;
+	std::string ppnode_traj_name;
+	pnh.param<std::string>("MavrosPoseTopic", mavros_pose_node_name, "mavros/local_position/pose");
+	pnh.param<std::string>("MavrosBatteryTopic", mavros_battery_node_name, "mavros/battery");
+	pnh.param<std::string>("PathPlanningTargetTopic", ppnode_name, "pp_node/target_pose");
+	pnh.param<std::string>("PathPlanningTrajectoryTopic", ppnode_traj_name, "pp_node/trajectory");
+	
+	bool drawTraj;
+	pnh.param<bool>("PathPlanningDrawTrajectory", drawTraj, false);
+	
 	ros::Subscriber loc_sub = nh.subscribe<geometry_msgs::PoseStamped>
 		(mavros_pose_node_name, 10, loc_pos_cb);
 	ros::Subscriber bat_sub = nh.subscribe<sensor_msgs::BatteryState>
 		(mavros_battery_node_name, 10, bat_cb);
 	ros::Subscriber target_sub = nh.subscribe<geometry_msgs::PoseStamped>
 		(ppnode_name, 10, target_cb);
+	ros::Subscriber traj_sub;
+	if(drawTraj)
+		traj_sub = nh.subscribe<geometry_msgs::Polygon>(ppnode_traj_name, 10, traj_cb);
 //	ros::Subscriber state_sub = nh.subscribe<mavros_msgs::State>
 //		("mavros/state", 10, state_cb);
 
