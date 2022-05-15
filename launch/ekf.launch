@@ -1,8 +1,8 @@
 <launch>
 	
-	<arg name="uwb_x_offset" default="-1" />
-	<arg name="uwb_y_offset" default="-1" />
-	<arg name="uwb_z_offset" default="1.95" />
+	<arg name="uwb_x_offset" default="-1.05" />
+	<arg name="uwb_y_offset" default="-0.6" />
+	<arg name="uwb_z_offset" default="1.90" />
 
 	<node pkg="tf" type="static_transform_publisher" name="uwb_transformer" args="$(arg uwb_x_offset) $(arg uwb_y_offset) $(arg uwb_z_offset) 0 0 0 odom uwb 75"/>
 	<node pkg="robot_localization" type="ekf_localization_node" name="ekf_estimator">
