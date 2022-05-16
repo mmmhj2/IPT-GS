@@ -47,11 +47,11 @@ std::pair<int, int> GetPixelLoc(double x, double y)
 
 // A simple algorithm to draw wide lines by drawing parallel lines
 // Considering to use SDL_gfx library for finer drawing and better performance
-int DrawLineWidth(SDL_Renderer * renderer, int x1, int y1, int x2, int y2, int width = 3)
+int DrawLineWidth(SDL_Renderer * renderer, int x_1, int y_1, int x_2, int y_2, int width = 3)
 {
 	for(int i = -width; i <= width; ++i)
 	{
-		int ret = SDL_RenderDrawLine(renderer, x1 + i, y1 + i, x2 + i, y2 + i);
+		int ret = SDL_RenderDrawLine(renderer, x_1 + i, y_1 + i, x_2 + i, y_2 + i);
 		if(ret)
 			return ret;
 	}
@@ -191,18 +191,18 @@ int main(int argc, char * argv[])
 		}
 		else if(!traj_points.empty())
 		{
-			int x1, x2, y1, y2;
-			x1 = center.first, y1 = center.second;
-			std::tie(x2, y2) = GetPixelLoc(traj_points.begin()->x, traj_points.begin()->y);
-			if(DrawLineWidth(renderer, x1, y1, x2, y2))
-				ROS_ERROR("Cannot draw line from (%d, %d) to (%d, %d), %s",x1, y1, x2, y2, SDL_GetError());
+			int x_1, x_2, y_1, y_2;
+			x_1 = center.first, y_1 = center.second;
+			std::tie(x_2, y_2) = GetPixelLoc(traj_points.begin()->x, traj_points.begin()->y);
+			if(DrawLineWidth(renderer, x_1, y_1, x_2, y_2))
+				ROS_ERROR("Cannot draw line from (%d, %d) to (%d, %d), %s",x_1, y_1, x_2, y_2, SDL_GetError());
 			
 			for(auto point = traj_points.begin() + 1; point != traj_points.end(); ++point)
 			{
-				x1 = x2, y1 = y2;
-				std::tie(x2, y2) = GetPixelLoc(point->x, point->y);
-				if(DrawLineWidth(renderer, x1, y1, x2, y2))
-					ROS_ERROR("Cannot draw line from (%d, %d) to (%d, %d), %s",x1, y1, x2, y2, SDL_GetError());
+				x_1 = x_2, y_1 = y_2;
+				std::tie(x_2, y_2) = GetPixelLoc(point->x, point->y);
+				if(DrawLineWidth(renderer, x_1, y_1, x_2, y_2))
+					ROS_ERROR("Cannot draw line from (%d, %d) to (%d, %d), %s",x_1, y_1, x_2, y_2, SDL_GetError());
 			}
 		}
 		else
