@@ -26,10 +26,10 @@ void target_cb(const geometry_msgs::PoseStamped::ConstPtr & msg)
 	target_pos = *msg;
 }
 
-std::vector<geometry_msgs::Point32> points;
+std::vector<geometry_msgs::Point32> traj_points;
 void traj_cb(const geometry_msgs::Polygon::ConstPtr & msg)
 {
-	points = msg->points;
+	traj_points = msg->points;
 }
 
 double GetYaw(const geometry_msgs::Quaternion & quat)
@@ -43,6 +43,19 @@ std::pair<int, int> GetPixelLoc(double x, double y)
 {
 	constexpr double pixCoef = 788.68;
 	return std::make_pair(pixCoef * (-y - 0.64), pixCoef * (-x + 1.19));
+}
+
+// A simple algorithm to draw wide lines by drawing parallel lines
+// Considering to use SDL_gfx library for finer drawing and better performance
+int DrawLineWidth(SDL_Renderer * renderer, int x1, int y1, int x2, int y2, int width = 3)
+{
+	for(int i = -width; i <= width; ++i)
+	{
+		int ret = SDL_RenderDrawLine(renderer, x1 + i, y1 + i, x2 + i, y2 + i);
+		if(ret)
+			return ret;
+	}
+	return 0;
 }
 
 int main(int argc, char * argv[])
@@ -168,11 +181,32 @@ int main(int argc, char * argv[])
 		}
 
 		// Draw the target
-		center = GetPixelLoc(target_pos.pose.position.x, target_pos.pose.position.y);
-		drone.x = center.first - 64;
-		drone.y = center.second - 64;
-		drone.h = drone.w = 128;
-		SDL_RenderCopyEx(renderer, t_cursor, nullptr, &drone, 0, 0, flip);
+		if(!drawTraj)
+		{
+			center = GetPixelLoc(target_pos.pose.position.x, target_pos.pose.position.y);
+			drone.x = center.first - 64;
+			drone.y = center.second - 64;
+			drone.h = drone.w = 128;
+			SDL_RenderCopyEx(renderer, t_cursor, nullptr, &drone, 0, 0, flip);
+		}
+		else if(!traj_points.empty())
+		{
+			int x1, x2, y1, y2;
+			x1 = center.first, y1 = center.second;
+			std::tie(x2, y2) = GetPixelLoc(traj_points.begin()->x, traj_points.begin()->y);
+			if(DrawLineWidth(renderer, x1, y1, x2, y2))
+				ROS_ERROR("Cannot draw line from (%d, %d) to (%d, %d), %s",x1, y1, x2, y2, SDL_GetError());
+			
+			for(auto point = traj_points.begin() + 1; point != traj_points.end(); ++point)
+			{
+				x1 = x2, y1 = y2;
+				std::tie(x2, y2) = GetPixelLoc(point->x, point->y);
+				if(DrawLineWidth(renderer, x1, y1, x2, y2))
+					ROS_ERROR("Cannot draw line from (%d, %d) to (%d, %d), %s",x1, y1, x2, y2, SDL_GetError());
+			}
+		}
+		else
+			ROS_WARN("Trajectory is empty");
 
 		SDL_RenderPresent(renderer);
 		ros::spinOnce();
