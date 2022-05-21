@@ -4,12 +4,21 @@
 	</node>
 	
 	<node pkg="gcserver" type="pp_node" name="pp_node" output="screen">
-		<param name="GenerateTrajectory" type="bool" value="true"/>
 		<param name="start_x" type="double" value="0.0"/>
 		<param name="start_y" type="double" value="0.0"/>
-		<param name="end_x" type="double" value="0.50"/>
-		<param name="end_y" type="double" value="3.02"/>
-		<rosparam param="obstacles">[]</rosparam>
+		<param name="end_x" type="double" value="0"/>
+		<param name="end_y" type="double" value="1.5"/>
+		<param name="distance_threshold" type="double" value="1.5"/>
+		<param name="coef_replusion" type="double" value="1.0"/>
+		<param name="coef_attraction" type="double" value="1.0"/>
+		
+		<param name="GenerateTrajectory" type="bool" value="true"/>
+		<param name="TrajectoryIteration" type="int" value="25"/>
+
+		<rosparam param="obstacles">
+- - -0.5
+  - -0.2
+</rosparam>
 	</node>
 	
 	<node pkg="gcserver" type="dummy_publisher.py" name="dummy_publisher" output="screen">

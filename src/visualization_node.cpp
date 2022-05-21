@@ -28,10 +28,14 @@ void target_cb(const geometry_msgs::PoseStamped::ConstPtr & msg)
 	target_pos = *msg;
 }
 
-std::vector<geometry_msgs::Point32> traj_points;
+std::vector<geometry_msgs::Point32> traj_points, obst_points;
 void traj_cb(const geometry_msgs::Polygon::ConstPtr & msg)
 {
 	traj_points = msg->points;
+}
+void obst_cb(const geometry_msgs::Polygon::ConstPtr & msg)
+{
+	obst_points = msg->points;
 }
 
 double GetYaw(const geometry_msgs::Quaternion & quat)
@@ -44,7 +48,7 @@ double GetYaw(const geometry_msgs::Quaternion & quat)
 std::pair<int, int> GetPixelLoc(double x, double y)
 {
 	constexpr double pixCoef = 788.68;
-	return std::make_pair(pixCoef * (-y + 1920 / 2 / pixCoef), pixCoef * (x + 1080 / 2 / pixCoef));
+	return std::make_pair(pixCoef * (x + 1920 / 2 / pixCoef), pixCoef * (-y + 1080 / 2 / pixCoef));
 }
 
 // A simple algorithm to draw wide lines by drawing parallel lines
@@ -79,6 +83,7 @@ void DrawBattery(SDL_Renderer * renderer, SDL_Rect battery_rect)
 
 void DrawTrajectory(SDL_Renderer * renderer, int start_x, int start_y)
 {
+	ROS_INFO_STREAM_THROTTLE(1, "Drawing " << traj_points.size() << " waypoints.");
 	int x_1, x_2, y_1, y_2;
 	x_1 = start_x, y_1 = start_y;
 	std::tie(x_2, y_2) = GetPixelLoc(traj_points.begin()->x, traj_points.begin()->y);
@@ -96,6 +101,19 @@ void DrawTrajectory(SDL_Renderer * renderer, int start_x, int start_y)
 	}
 }
 
+void DrawObstacles(SDL_Renderer * renderer)
+{
+	constexpr int RADIUS = 10;
+	ROS_INFO_STREAM_THROTTLE(1, "Drawing " << obst_points.size() << " obstacles.");
+	for(const auto & point : obst_points)
+	{
+		int x, y;
+		std::tie(x, y) = GetPixelLoc(point.x, point.y);
+		if(filledCircleRGBA(renderer, x, y, RADIUS, 255, 0, 0, 255))
+			ROS_ERROR("Cannot draw circle at (%d, %d), radius %d", x, y, RADIUS);
+	}
+}
+
 int main(int argc, char * argv[])
 {
 	ros::init(argc, argv, "visualization_node");
@@ -105,10 +123,12 @@ int main(int argc, char * argv[])
 	std::string mavros_battery_node_name /*= "mavros/battery"*/;
 	std::string ppnode_name /*= "pp_node/target_pose"*/;
 	std::string ppnode_traj_name;
+	std::string ppnode_obstacle_name;
 	pnh.param<std::string>("MavrosPoseTopic", mavros_pose_node_name, "mavros/local_position/pose");
 	pnh.param<std::string>("MavrosBatteryTopic", mavros_battery_node_name, "mavros/battery");
 	pnh.param<std::string>("PathPlanningTargetTopic", ppnode_name, "pp_node/target_pose");
 	pnh.param<std::string>("PathPlanningTrajectoryTopic", ppnode_traj_name, "pp_node/trajectory");
+	pnh.param<std::string>("PathPlanningObstacleTopic", ppnode_obstacle_name, "pp_node/obstacles");
 	
 	bool drawTraj;
 	pnh.param<bool>("PathPlanningDrawTrajectory", drawTraj, false);
@@ -122,6 +142,9 @@ int main(int argc, char * argv[])
 	ros::Subscriber traj_sub;
 	if(drawTraj)
 		traj_sub = nh.subscribe<geometry_msgs::Polygon>(ppnode_traj_name, 10, traj_cb);
+	ros::Subscriber obst_sub = nh.subscribe<geometry_msgs::Polygon>
+		(ppnode_obstacle_name, 5, obst_cb);
+	
 //	ros::Subscriber state_sub = nh.subscribe<mavros_msgs::State>
 //		("mavros/state", 10, state_cb);
 
@@ -181,6 +204,9 @@ int main(int argc, char * argv[])
 		SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
 		SDL_RenderClear(renderer);
 		//SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);
+		
+		// Draw obstacles
+		DrawObstacles(renderer);
 		
 		// Draw the drone
 		SDL_Rect drone;

@@ -51,7 +51,7 @@ int main(int argc, char **argv)
 	pnh.param<double>("coef_replusion", coef_repl, 10.0);
 	pnh.param<double>("distance_threshold", dist_threshold, 3);
 	pnh.param<int>("max_iteration", max_iter, 5000);
-	pnh.param<double>("march", march, 0.25);
+	pnh.param<double>("march", march, 0.1);
 	pnh.param<double>("tolerance", tolerance, 0.1);
 	
 	bool generate_traj;
