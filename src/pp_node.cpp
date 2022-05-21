@@ -32,8 +32,10 @@ int main(int argc, char **argv)
 	
 	std::string target_pos_topic /*= "pp_node/target_pose"*/;
 	std::string trajectory_topic /*= "pp_node/tarjectory"*/;
+	std::string obstacles_topic;
 	pnh.param<std::string>("TargetTopicName", target_pos_topic, "pp_node/target_pose");
 	pnh.param<std::string>("TrajectoryTopic", trajectory_topic, "pp_node/trajectory");
+	pnh.param<std::string>("ObstaclesTopic", obstacles_topic, "pp_node/obstacles");
 	
 	// Parameters
 	double z_threshold;
@@ -53,9 +55,10 @@ int main(int argc, char **argv)
 	pnh.param<double>("tolerance", tolerance, 0.1);
 	
 	bool generate_traj;
-	int traj_iteration;
+	int traj_iteration, obstacle_period_multiplier;
 	pnh.param<bool>("GenerateTrajectory", generate_traj, false);
 	pnh.param<int>("TrajectoryIteration", traj_iteration, 10);
+	pnh.param<int>("ObstaclePublishPeriodMultiplier", obstacle_period_multiplier, 20);
 
 	APFHelper apfhelper(coef_attr, coef_repl, dist_threshold);
 	ArtificialPotentialField apf(&apfhelper, max_iter, march, tolerance);
@@ -68,6 +71,8 @@ int main(int argc, char **argv)
 	ros::Publisher traj_pub;
 	if(generate_traj)
 		traj_pub = nh.advertise<geometry_msgs::Polygon>(trajectory_topic, 10);
+	ros::Publisher obstacle_pub = nh.advertise<geometry_msgs::Polygon>(obstacles_topic, 5);
+	
 		
 	ros::Rate rate{20.0};
 	
@@ -103,6 +108,7 @@ int main(int argc, char **argv)
 
 	while(ros::ok())
 	{
+		static int periodCounter = 0;
 		ROS_DEBUG("Planning route");
 		trajectory.points.clear();
 		
@@ -145,7 +151,7 @@ int main(int argc, char **argv)
 				targetPose.pose.position.x = newtarget.x;
 				targetPose.pose.position.y = newtarget.y;
 				targetPose.pose.position.z = z_threshold;
-				ROS_INFO("Moving to : %f, %f", targetPose.pose.position.x, targetPose.pose.position.y);
+				ROS_INFO_THROTTLE(1, "Moving to : %f, %f", targetPose.pose.position.x, targetPose.pose.position.y);
 				
 				if(generate_traj)
 				{
@@ -166,10 +172,26 @@ int main(int argc, char **argv)
 			}
 		}
 		
+		// Publish the obstacles
+		if(periodCounter == 0)
+		{
+			geometry_msgs::Polygon poly;
+			for(const auto & obstacle : obs)
+			{
+				geometry_msgs::Point32 p;
+				p.x = obstacle.x;
+				p.y = obstacle.y;
+				p.z = 0;
+				poly.points.push_back(std::move(p));
+			}
+			obstacle_pub.publish(poly);
+		}
+		
 		target_pos_pub.publish(targetPose);
 		if(generate_traj)
 			traj_pub.publish(trajectory);
 		
+		periodCounter = (periodCounter + 1) % obstacle_period_multiplier;
 		ros::spinOnce();
 		rate.sleep();
 	}
