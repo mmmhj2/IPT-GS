@@ -10,6 +10,7 @@ project(gcserver)
 find_package(catkin REQUIRED COMPONENTS
 	roscpp
 	roslib
+	rospy
 	geometry_msgs
 	tf2_ros
 )

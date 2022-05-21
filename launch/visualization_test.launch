@@ -1,0 +1,15 @@
+<launch>
+	<node pkg="gcserver" type="visualization_node" name="visualization_node" output="screen">
+	</node>
+	
+	<node pkg="gcserver" type="pp_node" name="pp_node" output="screen">
+		<param name="start_x" type="double" value="0.0"/>
+		<param name="start_y" type="double" value="0.0"/>
+		<param name="end_x" type="double" value="0.50"/>
+		<param name="end_y" type="double" value="3.02"/>
+		<rosparam param="obstacles">[]</rosparam>
+	</node>
+	
+	<node pkg="gcserver" type="dummy_publisher.py" name="dummy_publisher" output="screen">
+	</node>
+</launch>
