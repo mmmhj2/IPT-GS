@@ -60,6 +60,42 @@ int DrawLineWidth(SDL_Renderer * renderer, int x_1, int y_1, int x_2, int y_2, i
 	return 0;
 }
 
+void DrawBattery(SDL_Renderer * renderer, SDL_Rect battery_rect)
+{
+	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);			
+	SDL_RenderFillRect(renderer, &battery_rect);
+	if(!(0 < bat.percentage && bat.percentage < 1))
+	{
+		//if(!bat_aquired)
+		ROS_WARN_THROTTLE(1, "Ignoring battery level : %f", bat.percentage);
+	}
+	else
+	{
+		battery_rect.w *= bat.percentage;
+		SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);
+		SDL_RenderFillRect(renderer, &battery_rect);
+	}	
+}
+
+void DrawTrajectory(SDL_Renderer * renderer, int start_x, int start_y)
+{
+	int x_1, x_2, y_1, y_2;
+	x_1 = start_x, y_1 = start_y;
+	std::tie(x_2, y_2) = GetPixelLoc(traj_points.begin()->x, traj_points.begin()->y);
+	//if(DrawLineWidth(renderer, x_1, y_1, x_2, y_2))
+	if(thickLineRGBA(renderer, x_1, y_1, x_2, y_2, 3, 255, 255, 255, 255))
+		ROS_ERROR("Cannot draw line from (%d, %d) to (%d, %d), %s",x_1, y_1, x_2, y_2, SDL_GetError());
+	
+	for(auto point = traj_points.begin() + 1; point != traj_points.end(); ++point)
+	{
+		x_1 = x_2, y_1 = y_2;
+		std::tie(x_2, y_2) = GetPixelLoc(point->x, point->y);
+		//if(DrawLineWidth(renderer, x_1, y_1, x_2, y_2))
+		if(thickLineRGBA(renderer, x_1, y_1, x_2, y_2, 3, 255, 255, 255, 255))
+			ROS_ERROR("Cannot draw line from (%d, %d) to (%d, %d), %s",x_1, y_1, x_2, y_2, SDL_GetError());
+	}
+}
+
 int main(int argc, char * argv[])
 {
 	ros::init(argc, argv, "visualization_node");
@@ -168,19 +204,7 @@ int main(int argc, char * argv[])
 		SDL_Rect battery;
 		battery.x = center.first - 128, battery.y = center.second + 128;
 		battery.w = 256, battery.h = 32;
-		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);			
-		SDL_RenderFillRect(renderer, &battery);
-		if(!(0 < bat.percentage && bat.percentage < 1))
-		{
-			//if(!bat_aquired)
-			ROS_WARN_THROTTLE(1, "Ignoring battery level : %f", bat.percentage);
-		}
-		else
-		{
-			battery.w *= bat.percentage;
-			SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);
-			SDL_RenderFillRect(renderer, &battery);
-		}
+		DrawBattery(renderer, battery);
 
 		// Draw the target
 		if(!drawTraj)
@@ -193,21 +217,7 @@ int main(int argc, char * argv[])
 		}
 		else if(!traj_points.empty())
 		{
-			int x_1, x_2, y_1, y_2;
-			x_1 = center.first, y_1 = center.second;
-			std::tie(x_2, y_2) = GetPixelLoc(traj_points.begin()->x, traj_points.begin()->y);
-			//if(DrawLineWidth(renderer, x_1, y_1, x_2, y_2))
-			if(thickLineRGBA(renderer, x_1, y_1, x_2, y_2, 3, 255, 255, 255, 255))
-				ROS_ERROR("Cannot draw line from (%d, %d) to (%d, %d), %s",x_1, y_1, x_2, y_2, SDL_GetError());
-			
-			for(auto point = traj_points.begin() + 1; point != traj_points.end(); ++point)
-			{
-				x_1 = x_2, y_1 = y_2;
-				std::tie(x_2, y_2) = GetPixelLoc(point->x, point->y);
-				//if(DrawLineWidth(renderer, x_1, y_1, x_2, y_2))
-				if(thickLineRGBA(renderer, x_1, y_1, x_2, y_2, 3, 255, 255, 255, 255))
-					ROS_ERROR("Cannot draw line from (%d, %d) to (%d, %d), %s",x_1, y_1, x_2, y_2, SDL_GetError());
-			}
+			DrawTrajectory(renderer, center.first, center.second);
 		}
 		else
 			ROS_WARN("Trajectory is empty");
