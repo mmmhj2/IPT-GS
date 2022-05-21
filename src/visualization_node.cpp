@@ -6,6 +6,8 @@
 #include <SDL2/SDL.h>
 #include <utility>
 
+#include "sdl2_gfx/SDL2_gfxPrimitives.h"
+
 geometry_msgs::PoseStamped loc_pos;
 void loc_pos_cb(const geometry_msgs::PoseStamped::ConstPtr & msg)
 {
@@ -194,14 +196,16 @@ int main(int argc, char * argv[])
 			int x_1, x_2, y_1, y_2;
 			x_1 = center.first, y_1 = center.second;
 			std::tie(x_2, y_2) = GetPixelLoc(traj_points.begin()->x, traj_points.begin()->y);
-			if(DrawLineWidth(renderer, x_1, y_1, x_2, y_2))
+			//if(DrawLineWidth(renderer, x_1, y_1, x_2, y_2))
+			if(thickLineRGBA(renderer, x_1, y_1, x_2, y_2, 3, 255, 255, 255, 255))
 				ROS_ERROR("Cannot draw line from (%d, %d) to (%d, %d), %s",x_1, y_1, x_2, y_2, SDL_GetError());
 			
 			for(auto point = traj_points.begin() + 1; point != traj_points.end(); ++point)
 			{
 				x_1 = x_2, y_1 = y_2;
 				std::tie(x_2, y_2) = GetPixelLoc(point->x, point->y);
-				if(DrawLineWidth(renderer, x_1, y_1, x_2, y_2))
+				//if(DrawLineWidth(renderer, x_1, y_1, x_2, y_2))
+				if(thickLineRGBA(renderer, x_1, y_1, x_2, y_2, 3, 255, 255, 255, 255))
 					ROS_ERROR("Cannot draw line from (%d, %d) to (%d, %d), %s",x_1, y_1, x_2, y_2, SDL_GetError());
 			}
 		}

@@ -137,7 +137,13 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(visualization_node src/visualization_node.cpp)
+
+aux_source_directory("./src/sdl2_gfx" DIR_SDL2_GFX)
+
+add_executable(visualization_node 
+src/visualization_node.cpp
+${DIR_SDL2_GFX}
+)
 target_link_libraries(visualization_node ${catkin_LIBRARIES} ${SDL2_LIBRARIES})
 
 add_executable(offboard_node src/offboard_node.cpp)
