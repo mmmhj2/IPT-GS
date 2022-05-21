@@ -18,7 +18,7 @@ if __name__ == "__main__":
     rate = rp.Rate(30)
     
     pose = PoseStamped()
-    pose.pose.position.x = -1
+    pose.pose.position.x = 0
     pose.pose.position.y = 0
     pose.pose.position.z = 1
     pose.pose.orientation.w = 1

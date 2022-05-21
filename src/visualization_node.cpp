@@ -44,7 +44,7 @@ double GetYaw(const geometry_msgs::Quaternion & quat)
 std::pair<int, int> GetPixelLoc(double x, double y)
 {
 	constexpr double pixCoef = 788.68;
-	return std::make_pair(pixCoef * (-y - 0.64), pixCoef * (-x + 1.19));
+	return std::make_pair(pixCoef * (-y + 1920 / 2 / pixCoef), pixCoef * (x + 1080 / 2 / pixCoef));
 }
 
 // A simple algorithm to draw wide lines by drawing parallel lines
@@ -173,7 +173,7 @@ int main(int argc, char * argv[])
 		if(!(0 < bat.percentage && bat.percentage < 1))
 		{
 			//if(!bat_aquired)
-			ROS_INFO("Ignoring battery level : %f", bat.percentage);
+			ROS_WARN_THROTTLE(1, "Ignoring battery level : %f", bat.percentage);
 		}
 		else
 		{
