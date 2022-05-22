@@ -6,6 +6,7 @@
 #include <SDL2/SDL.h>
 #include <utility>
 
+#include "ColorSpaceCvt.h"
 #include "sdl2_gfx/SDL2_gfxPrimitives.h"
 
 constexpr int WIDTH = 1920, HEIGHT = 1080;
