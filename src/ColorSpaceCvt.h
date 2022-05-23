@@ -6,6 +6,9 @@
 
 #include <cmath>
 
+#pragma gcc push
+#pragma gcc optimize("O3")
+
 namespace cvt
 {
 	constexpr float LABXRF = 0.433953f;
@@ -200,5 +203,7 @@ namespace cvt
 	}
 	
 }
+
+#pragma gcc pop
 
 #endif
