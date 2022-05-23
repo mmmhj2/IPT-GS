@@ -10,7 +10,7 @@ int main(int argc, char * argv[])
 		return 0;
 	}
 	
-	cvt::InitTable();
+	//cvt::InitTable();
 	
 	unsigned char BGR[4];
 	for(int i = 1; i < argc; i += 3)

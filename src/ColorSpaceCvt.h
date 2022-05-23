@@ -71,8 +71,26 @@ namespace cvt
 	int TabY[256 * 4];
 	int TabZ[256 * 256 * 4];
 	
+	bool isInit = false;
+	
+	[[gnu::always_inline]]
+	inline byte clamp_0_255(int n)
+	{
+		constexpr int INTSIZE = 32;
+		n &= -(n >= 0);
+		return n | ((255 - n) >> INTSIZE - 1);
+	}
+	
+	[[gnu::always_inline]]
+	inline byte clamp_0_255_cmove(int n)
+	{
+		int x = n > 255 ? 255 : n;
+		return (x < 0 ? 0 : x);
+	}
+	
 	void InitTable()
 	{
+		isInit = true;
 		int I, J, Index = 0;
 		float X, Y, Z, T;
 		for (I = 0; I < 1024; I++)
@@ -115,6 +133,10 @@ namespace cvt
 	// Convert pixels from BGRA32 to CIELAB(L* a* b* A)
 	void BGR2CIELab(byte * pixels, size_t length)
 	{
+		[[gnu::unlikely]]
+		if(!isInit)
+			InitTable();
+		
 		int X, Y, Z, L, A, B;
 		int Blue, Green, Red;
 		
@@ -137,9 +159,10 @@ namespace cvt
 			L = ((ScaleLT * Y - ScaleLC + HalfShiftValue) >> Shift);
 			A = ((500 * (X - Y) + HalfShiftValue) >> Shift) + 128;
 			B = ((200 * (Y - Z) + HalfShiftValue) >> Shift) + 128;
-			ptr[0] = (byte)(L & 0xFF);
-			ptr[1] = (byte)(A & 0xFF);
-			ptr[2] = (byte)(B & 0xFF);
+			
+			ptr[0] = clamp_0_255(L);
+			ptr[1] = clamp_0_255(A);
+			ptr[2] = clamp_0_255(B);
 			
 			ptr += 4;
 		}
@@ -148,6 +171,10 @@ namespace cvt
 	
 	void CIELab2BGR(byte * pixels, size_t length)
 	{
+		[[gnu::unlikely]]
+		if(!isInit)
+			InitTable();
+		
 		int X, Y, Z, L, A, B;
 		int Blue, Green, Red;
 		byte * ptr = (byte *)pixels;
@@ -164,9 +191,9 @@ namespace cvt
 			Green = (X * LABGXI + Y * LABGYI + Z * LABGZI + HalfShiftValue) >> Shift;
 			Red = (X * LABRXI + Y * LABRYI + Z * LABRZI + HalfShiftValue) >> Shift;
 
-			ptr[0] = (byte)(Blue & 0xFF);
-			ptr[1] = (byte)(Green & 0xFF);
-			ptr[2] = (byte)(Red & 0xFF);	
+			ptr[0] = clamp_0_255(Blue);
+			ptr[1] = clamp_0_255(Green);
+			ptr[2] = clamp_0_255(Red);	
 			
 			ptr += 4;
 		}
