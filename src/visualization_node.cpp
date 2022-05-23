@@ -6,7 +6,7 @@
 #include <SDL2/SDL.h>
 #include <utility>
 
-#include "ColorSpaceCvt.h"
+#include "modulation.h"
 #include "sdl2_gfx/SDL2_gfxPrimitives.h"
 
 constexpr int WIDTH = 1920, HEIGHT = 1080;
@@ -228,6 +228,8 @@ int main(int argc, char * argv[])
 		return -1;
 	}
 	
+	modulation::LoadMaskMap(label_path+"mask.bmp");
+	
 	//while(ros::ok	
 	int period_multiplier = 0;
 	
@@ -285,13 +287,17 @@ int main(int argc, char * argv[])
 		}
 		
 		// Generate modulated frame 1
-		if(period_multiplier % 10 == 0)
+		if(period_multiplier % 10 == 1)
 		{
+			SDL_BlitSurface(unbiased_surface, nullptr, biased_surface[0], nullptr);
+			modulation::CreateFrame(biased_surface[0], +5);
 		}
 		
 		// Generate modulated frame 2
-		if(period_multiplier % 10 == 1)
+		if(period_multiplier % 10 == 2)
 		{
+			SDL_BlitSurface(unbiased_surface, nullptr, biased_surface[1], nullptr);
+			modulation::CreateFrame(biased_surface[1], -5);
 		}
 		
 
@@ -307,6 +313,7 @@ int main(int argc, char * argv[])
 	SDL_DestroyTexture(t_cursor);
 	SDL_FreeSurface(s_label);
 	SDL_FreeSurface(s_cursor);
+	modulation::CleanUp();
 	
 	SDL_DestroyRenderer(unbiased_softrender);
 	SDL_FreeSurface(unbiased_surface);
