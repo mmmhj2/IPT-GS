@@ -5,6 +5,9 @@
 #define _COLORSPACECVT_H_
 
 #include <cmath>
+#include <thread>
+#include <future>
+#include <vector>
 
 #pragma gcc push
 #pragma gcc optimize("O3")
@@ -133,13 +136,8 @@ namespace cvt
 	}
 	
 	
-	// Convert pixels from BGRA32 to CIELAB(L* a* b* A)
-	void BGR2CIELab(byte * pixels, size_t length)
+	void BGR2CIELab_Blk(byte * pixels, size_t length)
 	{
-		[[gnu::unlikely]]
-		if(!isInit)
-			InitTable();
-		
 		int X, Y, Z, L, A, B;
 		int Blue, Green, Red;
 		
@@ -169,15 +167,33 @@ namespace cvt
 			
 			ptr += 4;
 		}
-		
 	}
 	
-	void CIELab2BGR(byte * pixels, size_t length)
+	// Convert pixels from BGRA32 to CIELAB(L* a* b* A)
+	void BGR2CIELab(byte * pixels, size_t length)
 	{
 		[[gnu::unlikely]]
 		if(!isInit)
 			InitTable();
 		
+		// Partition the pixels
+		int blocks = std::thread::hardware_concurrency() - 1;
+		int length_per_block = (length + blocks) / blocks;
+		// Align to 4 bytes
+		length_per_block = (length_per_block >> 2) << 2;
+		int length_last_block = length - length_per_block * (blocks - 1);
+		
+		// Create threads
+		std::vector <std::future<void>> pools;
+		for(int i = 0; i < blocks - 1; i++)
+			pools.push_back(std::async(BGR2CIELab_Blk, pixels + length_per_block * i, length_per_block));
+		pools.push_back(std::async(BGR2CIELab_Blk, pixels + length_per_block * (blocks - 1), length_last_block));
+		
+		std::for_each(pools.begin(), pools.end(), [](auto & task){task.wait();});
+	}
+	
+	void CIELab2BGR_Blk(byte * pixels, size_t length)
+	{
 		int X, Y, Z, L, A, B;
 		int Blue, Green, Red;
 		byte * ptr = (byte *)pixels;
@@ -200,6 +216,28 @@ namespace cvt
 			
 			ptr += 4;
 		}
+	}
+	
+	void CIELab2BGR(byte * pixels, size_t length)
+	{
+		[[gnu::unlikely]]
+		if(!isInit)
+			InitTable();
+		
+		// Partition the pixels
+		int blocks = std::thread::hardware_concurrency() - 1;
+		int length_per_block = (length + blocks) / blocks;
+		// Align to 4 bytes
+		length_per_block = (length_per_block >> 2) << 2;
+		int length_last_block = length - length_per_block * (blocks - 1);
+		
+		// Create threads
+		std::vector <std::future<void>> pools;
+		for(int i = 0; i < blocks - 1; i++)
+			pools.push_back(std::async(CIELab2BGR_Blk, pixels + length_per_block * i, length_per_block));
+		pools.push_back(std::async(CIELab2BGR_Blk, pixels + length_per_block * (blocks - 1), length_last_block));
+		
+		std::for_each(pools.begin(), pools.end(), [](auto & task){task.wait();});
 	}
 	
 }
