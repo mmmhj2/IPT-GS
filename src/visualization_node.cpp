@@ -1,3 +1,5 @@
+#define BENCHMARK
+
 #include <ros/ros.h>
 #include <ros/package.h>
 #include <geometry_msgs/Polygon.h>
@@ -8,6 +10,9 @@
 
 #include "modulation.h"
 #include "sdl2_gfx/SDL2_gfxPrimitives.h"
+#ifdef BENCHMARK
+#include <chrono>
+#endif
 
 constexpr int WIDTH = 1920, HEIGHT = 1080;
 
@@ -235,6 +240,9 @@ int main(int argc, char * argv[])
 	
 	while(ros::ok())
 	{
+#ifdef BENCHMARK
+		auto start = std::chrono::steady_clock::now();
+#endif
 		// Draw new surface each 10 frame
 		if(period_multiplier % 10 == 0)
 		{
@@ -304,6 +312,11 @@ int main(int argc, char * argv[])
 		SDL_BlitSurface(biased_surface[period_multiplier & 1], nullptr, window_surface, nullptr);
 		SDL_UpdateWindowSurface(window);
 		//SDL_RenderPresent(renderer);
+#ifdef BENCHMARK
+		auto end = std::chrono::steady_clock::now();
+		ROS_INFO("Loop %d cost %ld us.", period_multiplier, 
+			std::chrono::duration_cast<std::chrono::microseconds>(end - start).count());
+#endif
 		ros::spinOnce();
 		rate.sleep();
 		period_multiplier++;
