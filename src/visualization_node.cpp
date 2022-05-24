@@ -171,6 +171,8 @@ int main(int argc, char * argv[])
 	}
 	
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+	glEnable(GL_TEXTURE_2D);
+	glEnable(GL_ARB_texture_non_power_of_two);
 	
 	window = SDL_CreateWindow("Visual", SDL_WINDOWPOS_CENTERED,
 			SDL_WINDOWPOS_CENTERED,
@@ -189,13 +191,14 @@ int main(int argc, char * argv[])
 		return -1;
 	}
 	ROS_INFO("Successfully initialized visualization system");
-	
+	/*
 	SDL_GLContext window_gl_context = SDL_GL_CreateContext(window);
 	if(!window_gl_context)
 	{
 		ROS_FATAL("Cannot create OpenGL context, %s", SDL_GetError());
 		return -1;
 	}
+	*/
 
 	SDL_RendererFlip flip = SDL_FLIP_NONE;
 	
@@ -252,6 +255,12 @@ int main(int argc, char * argv[])
 	//while(ros::ok	
 	int period_multiplier = 0;
 	
+#ifdef USE_OPENGL
+	GLuint gl_biased_texture[2] = {0, 0};
+	// Generate 2 textures
+	glGenTextures(2, gl_biased_texture);
+	ROS_INFO("Created 2 textures, %d and %d", gl_biased_texture[0], gl_biased_texture[1]);
+#else
 	// Draw directly instead of using alpha blending
 	int result = 0;
 	//result |= SDL_SetSurfaceBlendMode(window_surface, SDL_BLENDMODE_NONE);
@@ -268,6 +277,7 @@ int main(int argc, char * argv[])
 	result |= SDL_SetSurfaceRLE(biased_surface[1], 1);
 	if(result)
 		ROS_WARN("Cannot enable RLE optimization, %s", SDL_GetError());
+#endif
 	
 	while(ros::ok())
 	{
@@ -342,32 +352,56 @@ int main(int argc, char * argv[])
 		// Create textures to speed up rendering
 		if(period_multiplier % 10 == 3)
 		{
+#ifdef USE_OPENGL
+			// Create texture from SDL surface
+			ROS_INFO("Creating texture 1");
+			if(SDL_MUSTLOCK(biased_surface[0]))
+				SDL_LockSurface(biased_surface[0]);
+			
+			glEnable(GL_TEXTURE_2D);
+			glBindTexture(GL_TEXTURE_2D, gl_biased_texture[0]);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, biased_surface[0]->w, biased_surface[0]->h, 0, GL_BGRA, GL_UNSIGNED_BYTE, biased_surface[0]->pixels);
+			
+			int err = glGetError();
+			if(err != GL_NO_ERROR)
+			{
+				ROS_FATAL("Cannot create image texture, OpenGL error id %d.", err);
+				return -1;
+			}
+			
+			if(SDL_MUSTLOCK(biased_surface[0]))
+				SDL_UnlockSurface(biased_surface[0]);
+			
+#else
 			if(biased_texture[0])
 				SDL_DestroyTexture(biased_texture[0]);
 			biased_texture[0] = SDL_CreateTextureFromSurface(window_renderer, biased_surface[0]);
-#ifdef USE_OPENGL
-			glActiveTexture(GL_TEXTURE0);
-			int ret = SDL_GL_BindTexture(biased_texture[0], nullptr, nullptr);
-			if(ret)
-			{
-				ROS_FATAL("Cannot bind texture, %s", SDL_GetError());
-				return -1;
-			}
 #endif
 		}
 		if(period_multiplier % 10 == 4)
 		{
+#ifdef USE_OPENGL
+			
+			if(SDL_MUSTLOCK(biased_surface[1]))
+				SDL_LockSurface(biased_surface[1]);
+			
+			glBindTexture(GL_TEXTURE_2D, gl_biased_texture[1]);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, biased_surface[1]->w, biased_surface[1]->h, 0, GL_BGRA, GL_UNSIGNED_BYTE, biased_surface[1]->pixels);
+			glEnable(GL_TEXTURE_2D);
+			
+			int err = glGetError();
+			if(err != GL_NO_ERROR)
+			{
+				ROS_FATAL("Cannot create image texture, OpenGL error id %d.", err);
+				return -1;
+			}
+			
+			if(SDL_MUSTLOCK(biased_surface[1]))
+				SDL_UnlockSurface(biased_surface[1]);
+#else
 			if(biased_texture[1])
 				SDL_DestroyTexture(biased_texture[1]);
 			biased_texture[1] = SDL_CreateTextureFromSurface(window_renderer, biased_surface[1]);
-#ifdef USE_OPENGL
-			glActiveTexture(GL_TEXTURE1);
-			int ret = SDL_GL_BindTexture(biased_texture[1], nullptr, nullptr);
-			if(ret)
-			{
-				ROS_FATAL("Cannot bind texture, %s", SDL_GetError());
-				return -1;
-			}
 #endif
 		}
 		
@@ -377,11 +411,22 @@ int main(int argc, char * argv[])
 		//SDL_RenderCopy(window_renderer, biased_texture[period_multiplier & 1], nullptr, nullptr);
 		//SDL_RenderPresent(window_renderer);
 #ifdef USE_OPENGL
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		SDL_GL_UnbindTexture(biased_texture[0]);
+		SDL_GL_UnbindTexture(biased_texture[1]);
+		
 		if(period_multiplier & 1 == 0)
-			glActiveTexture(GL_TEXTURE0);
+			SDL_GL_BindTexture(biased_texture[0], nullptr, nullptr);
 		else
-			glActiveTexture(GL_TEXTURE1);
+			SDL_GL_BindTexture(biased_texture[1], nullptr, nullptr);
+		
+		if(glGetError() != GL_NO_ERROR)
+		{
+			ROS_FATAL("Cannot bind texture, OpenGL error id %d.", glGetError());
+			return -1;
+		}
+			
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glBegin(GL_QUADS);
 		// Upper right
 		glTexCoord2f(1.0f, 0.0f);
@@ -397,7 +442,9 @@ int main(int argc, char * argv[])
 		glVertex2f(1.0f, -1.0f);
 		glEnd();
 		
-		SDL_GL_SwapWindow(window);	
+		SDL_GL_SwapWindow(window);
+		SDL_RenderPresent(window_renderer);
+		
 #else
 		SDL_RenderCopy(window_renderer, biased_texture[period_multiplier & 1], nullptr, nullptr);
 		SDL_RenderPresent(window_renderer);

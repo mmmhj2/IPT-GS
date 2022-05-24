@@ -68,6 +68,19 @@ namespace modulation
 		
 	}
 	
+	void Mask_Blk(cvt::byte * pixels, int length, int offset, int delta)
+	{
+		for(int index = 0; index < length; ++index)
+		{
+			if(((cvt::byte*)(mask->pixels))[offset + index] == 0x00)
+			{
+				int newL = (pixels)[(offset + index) * 4] + delta;
+				newL = (newL > 255 ? 255 : newL);
+				pixels[(offset + index) * 4] = (newL < 0 ? 0 : newL);
+			}
+		}
+	}
+	
 	void CreateFrame(SDL_Surface * to, int delta = 5)
 	{
 		
@@ -88,7 +101,7 @@ namespace modulation
 #ifdef BENCHMARK
 		auto clock2 = std::chrono::steady_clock::now();
 #endif		
-
+		/*
 		for(int index = 0; index < to->w * to->h; index++)
 		{
 			// masked byte
@@ -99,6 +112,22 @@ namespace modulation
 				((cvt::byte*)(to->pixels))[index * 4] = (newL < 0 ? 0 : newL);
 			}
 		}
+		*/
+		int blocks = std::thread::hardware_concurrency() - 1;
+		int tot_length = (to->w * to->h * 4);
+		int blk_length = tot_length / blocks;
+		blk_length = (blk_length >> 2) << 2;
+		
+		std::vector <std::future<void>> pools;
+		for(int i = 0; i < blocks - 1; i++)
+			pools.push_back(std::async(Mask_Blk, (cvt::byte*)to->pixels, blk_length, (blk_length * i) >> 2, delta));
+		pools.push_back(std::async(
+			Mask_Blk, (cvt::byte*)to->pixels,
+			tot_length - blk_length * (blocks - 1),
+			(blk_length * (blocks - 1)) >> 2,
+			delta));
+		
+		std::for_each(pools.begin(), pools.end(), [](auto & task){task.wait();});
 
 #ifdef BENCHMARK
 		auto clock3 = std::chrono::steady_clock::now();
