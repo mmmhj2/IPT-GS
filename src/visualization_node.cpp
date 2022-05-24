@@ -8,6 +8,8 @@
 #include <SDL2/SDL.h>
 #include <utility>
 
+#include <SDL2/SDL_opengl.h>
+
 #include "modulation.h"
 #include "sdl2_gfx/SDL2_gfxPrimitives.h"
 #ifdef BENCHMARK
@@ -160,13 +162,16 @@ int main(int argc, char * argv[])
 	
 	ROS_INFO("Initializing SDL...");
 	SDL_Window * window;
-	SDL_Surface * window_surface;
+	//SDL_Surface * window_surface;
 	SDL_Renderer * window_renderer;
 	if(SDL_Init(SDL_INIT_VIDEO) != 0)
 	{
 		ROS_FATAL("Cannot initialize SDL library, %s", SDL_GetError());
 		return -1;
 	}
+	
+	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+	
 	window = SDL_CreateWindow("Visual", SDL_WINDOWPOS_CENTERED,
 			SDL_WINDOWPOS_CENTERED,
 			WIDTH, HEIGHT, SDL_WINDOW_FULLSCREEN_DESKTOP);
@@ -175,21 +180,29 @@ int main(int argc, char * argv[])
 		ROS_FATAL("Cannot create window, %s", SDL_GetError());
 		return -1;
 	}
-	window_surface = SDL_GetWindowSurface(window);
-	window_renderer = SDL_CreateSoftwareRenderer(window_surface);
+	//window_surface = SDL_GetWindowSurface(window);
+	//window_renderer = SDL_CreateSoftwareRenderer(window_surface);
+	window_renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_TARGETTEXTURE);
 	if(window_renderer == nullptr)
 	{
 		ROS_FATAL("Cannot create renderer, %s", SDL_GetError());
 		return -1;
 	}
 	ROS_INFO("Successfully initialized visualization system");
+	
+	SDL_GLContext window_gl_context = SDL_GL_CreateContext(window);
+	if(!window_gl_context)
+	{
+		ROS_FATAL("Cannot create OpenGL context, %s", SDL_GetError());
+		return -1;
+	}
 
 	SDL_RendererFlip flip = SDL_FLIP_NONE;
 	
 	// The surface containing image that has not been modulated
 	SDL_Surface * unbiased_surface;
 	SDL_Renderer * unbiased_softrender;
-	unbiased_surface = SDL_CreateRGBSurfaceWithFormat(0, WIDTH, HEIGHT, 24, SDL_PIXELFORMAT_BGRA32);
+	unbiased_surface = SDL_CreateRGBSurfaceWithFormat(0, WIDTH, HEIGHT, 32, SDL_PIXELFORMAT_BGRA32);
 	if(!unbiased_surface)
 	{
 		ROS_FATAL("Cannot create base surface, %s", SDL_GetError());
@@ -203,9 +216,10 @@ int main(int argc, char * argv[])
 	}
 	
 	// The surface containing modulated data
-	SDL_Surface * biased_surface[2];
-	biased_surface[0] = SDL_CreateRGBSurfaceWithFormat(0, WIDTH, HEIGHT, 24, SDL_PIXELFORMAT_BGRA32);
-	biased_surface[1] = SDL_CreateRGBSurfaceWithFormat(0, WIDTH, HEIGHT, 24, SDL_PIXELFORMAT_BGRA32);
+	SDL_Surface * biased_surface[2] = {nullptr, nullptr};
+	SDL_Texture * biased_texture[2] = {nullptr, nullptr};
+	biased_surface[0] = SDL_CreateRGBSurfaceWithFormat(0, WIDTH, HEIGHT, 32, SDL_PIXELFORMAT_BGRA32);
+	biased_surface[1] = SDL_CreateRGBSurfaceWithFormat(0, WIDTH, HEIGHT, 32, SDL_PIXELFORMAT_BGRA32);
 	if(biased_surface[0] == nullptr || biased_surface[1] == nullptr)
 	{
 		ROS_FATAL("Cannot create modulated surface, %s", SDL_GetError());
@@ -237,6 +251,23 @@ int main(int argc, char * argv[])
 	
 	//while(ros::ok	
 	int period_multiplier = 0;
+	
+	// Draw directly instead of using alpha blending
+	int result = 0;
+	//result |= SDL_SetSurfaceBlendMode(window_surface, SDL_BLENDMODE_NONE);
+	result |= SDL_SetSurfaceBlendMode(biased_surface[0], SDL_BLENDMODE_NONE);
+	result |= SDL_SetSurfaceBlendMode(biased_surface[1], SDL_BLENDMODE_NONE);
+	result |= SDL_SetSurfaceBlendMode(unbiased_surface, SDL_BLENDMODE_NONE);
+	if(result)
+		ROS_WARN("Cannot set surface blending mode, %s", SDL_GetError());
+	
+	// Enable RLE compression for surfaces
+	result = 0;
+	result |= SDL_SetSurfaceRLE(unbiased_surface, 1);
+	result |= SDL_SetSurfaceRLE(biased_surface[0], 1);
+	result |= SDL_SetSurfaceRLE(biased_surface[1], 1);
+	if(result)
+		ROS_WARN("Cannot enable RLE optimization, %s", SDL_GetError());
 	
 	while(ros::ok())
 	{
@@ -308,14 +339,73 @@ int main(int argc, char * argv[])
 			modulation::CreateFrame(biased_surface[1], -5);
 		}
 		
+		// Create textures to speed up rendering
+		if(period_multiplier % 10 == 3)
+		{
+			if(biased_texture[0])
+				SDL_DestroyTexture(biased_texture[0]);
+			biased_texture[0] = SDL_CreateTextureFromSurface(window_renderer, biased_surface[0]);
+#ifdef USE_OPENGL
+			glActiveTexture(GL_TEXTURE0);
+			int ret = SDL_GL_BindTexture(biased_texture[0], nullptr, nullptr);
+			if(ret)
+			{
+				ROS_FATAL("Cannot bind texture, %s", SDL_GetError());
+				return -1;
+			}
+#endif
+		}
+		if(period_multiplier % 10 == 4)
+		{
+			if(biased_texture[1])
+				SDL_DestroyTexture(biased_texture[1]);
+			biased_texture[1] = SDL_CreateTextureFromSurface(window_renderer, biased_surface[1]);
+#ifdef USE_OPENGL
+			glActiveTexture(GL_TEXTURE1);
+			int ret = SDL_GL_BindTexture(biased_texture[1], nullptr, nullptr);
+			if(ret)
+			{
+				ROS_FATAL("Cannot bind texture, %s", SDL_GetError());
+				return -1;
+			}
+#endif
+		}
+		
 
-		SDL_BlitSurface(biased_surface[period_multiplier & 1], nullptr, window_surface, nullptr);
-		SDL_UpdateWindowSurface(window);
-		//SDL_RenderPresent(renderer);
+		//SDL_BlitSurface(biased_surface[period_multiplier & 1], nullptr, window_surface, nullptr);
+		//SDL_UpdateWindowSurface(window);
+		//SDL_RenderCopy(window_renderer, biased_texture[period_multiplier & 1], nullptr, nullptr);
+		//SDL_RenderPresent(window_renderer);
+#ifdef USE_OPENGL
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		if(period_multiplier & 1 == 0)
+			glActiveTexture(GL_TEXTURE0);
+		else
+			glActiveTexture(GL_TEXTURE1);
+		glBegin(GL_QUADS);
+		// Upper right
+		glTexCoord2f(1.0f, 0.0f);
+		glVertex2f(1.0f, 1.0f);
+		// Upper left
+		glTexCoord2f(0.0f, 0.0f);
+		glVertex2f(-1.0f, 1.0f);
+		// Lower left
+		glTexCoord2f(0.0f, 1.0f);
+		glVertex2f(-1.0f, -1.0f);
+		// Lower right
+		glTexCoord2f(1.0f, 1.0f);
+		glVertex2f(1.0f, -1.0f);
+		glEnd();
+		
+		SDL_GL_SwapWindow(window);	
+#else
+		SDL_RenderCopy(window_renderer, biased_texture[period_multiplier & 1], nullptr, nullptr);
+		SDL_RenderPresent(window_renderer);
+#endif
 #ifdef BENCHMARK
 		auto end = std::chrono::steady_clock::now();
-		ROS_INFO("Loop %d cost %ld us.", period_multiplier, 
-			std::chrono::duration_cast<std::chrono::microseconds>(end - start).count());
+		auto timeCount = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+		ROS_INFO("Loop %d cost %f ms, expect %f fps", period_multiplier, timeCount / 1000.0, 1e6 / timeCount);
 #endif
 		ros::spinOnce();
 		rate.sleep();
@@ -334,7 +424,7 @@ int main(int argc, char * argv[])
 	SDL_FreeSurface(biased_surface[1]);
 
 	SDL_DestroyWindow(window);
-	//SDL_DestroyRenderer(renderer);
+	SDL_DestroyRenderer(window_renderer);
 	SDL_Quit();
 
 	return 0;

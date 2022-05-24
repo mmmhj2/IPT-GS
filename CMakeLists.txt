@@ -17,6 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 find_package(SDL2 REQUIRED)
 find_package(VRPN REQUIRED)
+find_package(OpenGL REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -145,7 +146,7 @@ add_executable(visualization_node
 src/visualization_node.cpp
 ${DIR_SDL2_GFX}
 )
-target_link_libraries(visualization_node ${catkin_LIBRARIES} ${SDL2_LIBRARIES})
+target_link_libraries(visualization_node ${catkin_LIBRARIES} ${SDL2_LIBRARIES} ${OPENGL_gl_LIBRARY})
 
 add_executable(offboard_node src/offboard_node.cpp)
 target_link_libraries(offboard_node ${catkin_LIBRARIES})
