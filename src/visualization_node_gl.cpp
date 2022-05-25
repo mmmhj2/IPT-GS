@@ -254,22 +254,10 @@ int main(int argc, char * argv[])
 	
 	//while(ros::ok	
 	int period_multiplier = 0;
-	// Draw directly instead of using alpha blending
-	int result = 0;
-	//result |= SDL_SetSurfaceBlendMode(window_surface, SDL_BLENDMODE_NONE);
-	result |= SDL_SetSurfaceBlendMode(biased_surface[0], SDL_BLENDMODE_NONE);
-	result |= SDL_SetSurfaceBlendMode(biased_surface[1], SDL_BLENDMODE_NONE);
-	result |= SDL_SetSurfaceBlendMode(unbiased_surface, SDL_BLENDMODE_NONE);
-	if(result)
-		ROS_WARN("Cannot set surface blending mode, %s", SDL_GetError());
-	
-	// Enable RLE compression for surfaces
-	result = 0;
-	result |= SDL_SetSurfaceRLE(unbiased_surface, 1);
-	result |= SDL_SetSurfaceRLE(biased_surface[0], 1);
-	result |= SDL_SetSurfaceRLE(biased_surface[1], 1);
-	if(result)
-		ROS_WARN("Cannot enable RLE optimization, %s", SDL_GetError());
+	GLuint gl_biased_texture[2] = {0, 0};
+	// Generate 2 textures
+	glGenTextures(2, gl_biased_texture);
+	ROS_INFO("Created 2 textures, %d and %d", gl_biased_texture[0], gl_biased_texture[1]);
 	
 	while(ros::ok())
 	{
@@ -344,15 +332,44 @@ int main(int argc, char * argv[])
 		// Create textures to speed up rendering
 		if(period_multiplier % 10 == 3)
 		{
-			if(biased_texture[0])
-				SDL_DestroyTexture(biased_texture[0]);
-			biased_texture[0] = SDL_CreateTextureFromSurface(window_renderer, biased_surface[0]);
+			// Create texture from SDL surface
+			ROS_INFO("Creating texture 1");
+			if(SDL_MUSTLOCK(biased_surface[0]))
+				SDL_LockSurface(biased_surface[0]);
+			
+			glEnable(GL_TEXTURE_2D);
+			glBindTexture(GL_TEXTURE_2D, gl_biased_texture[0]);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, biased_surface[0]->w, biased_surface[0]->h, 0, GL_BGRA, GL_UNSIGNED_BYTE, biased_surface[0]->pixels);
+			
+			int err = glGetError();
+			if(err != GL_NO_ERROR)
+			{
+				ROS_FATAL("Cannot create image texture, OpenGL error id %d.", err);
+				return -1;
+			}
+			
+			if(SDL_MUSTLOCK(biased_surface[0]))
+				SDL_UnlockSurface(biased_surface[0]);
 		}
 		if(period_multiplier % 10 == 4)
 		{
-			if(biased_texture[1])
-				SDL_DestroyTexture(biased_texture[1]);
-			biased_texture[1] = SDL_CreateTextureFromSurface(window_renderer, biased_surface[1]);
+			
+			if(SDL_MUSTLOCK(biased_surface[1]))
+				SDL_LockSurface(biased_surface[1]);
+			
+			glBindTexture(GL_TEXTURE_2D, gl_biased_texture[1]);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, biased_surface[1]->w, biased_surface[1]->h, 0, GL_BGRA, GL_UNSIGNED_BYTE, biased_surface[1]->pixels);
+			glEnable(GL_TEXTURE_2D);
+			
+			int err = glGetError();
+			if(err != GL_NO_ERROR)
+			{
+				ROS_FATAL("Cannot create image texture, OpenGL error id %d.", err);
+				return -1;
+			}
+			
+			if(SDL_MUSTLOCK(biased_surface[1]))
+				SDL_UnlockSurface(biased_surface[1]);
 		}
 		
 
@@ -360,9 +377,40 @@ int main(int argc, char * argv[])
 		//SDL_UpdateWindowSurface(window);
 		//SDL_RenderCopy(window_renderer, biased_texture[period_multiplier & 1], nullptr, nullptr);
 		//SDL_RenderPresent(window_renderer);
-		SDL_RenderCopy(window_renderer, biased_texture[period_multiplier & 1], nullptr, nullptr);
-		SDL_RenderPresent(window_renderer);
 
+		SDL_GL_UnbindTexture(biased_texture[0]);
+		SDL_GL_UnbindTexture(biased_texture[1]);
+		
+		if(period_multiplier & 1 == 0)
+			SDL_GL_BindTexture(biased_texture[0], nullptr, nullptr);
+		else
+			SDL_GL_BindTexture(biased_texture[1], nullptr, nullptr);
+		
+		if(glGetError() != GL_NO_ERROR)
+		{
+			ROS_FATAL("Cannot bind texture, OpenGL error id %d.", glGetError());
+			return -1;
+		}
+			
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glBegin(GL_QUADS);
+		// Upper right
+		glTexCoord2f(1.0f, 0.0f);
+		glVertex2f(1.0f, 1.0f);
+		// Upper left
+		glTexCoord2f(0.0f, 0.0f);
+		glVertex2f(-1.0f, 1.0f);
+		// Lower left
+		glTexCoord2f(0.0f, 1.0f);
+		glVertex2f(-1.0f, -1.0f);
+		// Lower right
+		glTexCoord2f(1.0f, 1.0f);
+		glVertex2f(1.0f, -1.0f);
+		glEnd();
+		
+		SDL_GL_SwapWindow(window);
+		SDL_RenderPresent(window_renderer);
+	
 #ifdef BENCHMARK
 		auto end = std::chrono::steady_clock::now();
 		auto timeCount = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
